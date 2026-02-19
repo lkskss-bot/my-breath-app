@@ -19,56 +19,33 @@ def announce_step(text, speech_enabled):
             </script>""", height=0,
         )
 
-# --- 스타일 커스텀 (아이폰 17 가로폭 강제 고정) ---
+# --- 스타일 커스텀 (아이폰 17 물리적 고정 레이아웃) ---
 st.markdown("""
     <style>
-    /* 광고 영역 확보 */
     .top-padding { height: 50px; } 
     .block-container { padding: 0.5rem; max-width: 100% !important; }
 
-    /* 타이머/준비 영역 높이 고정 및 중앙 */
+    /* 타이머/준비 영역 높이 및 중앙 고정 */
     .fixed-height-container {
         height: 140px; display: flex; flex-direction: column;
-        justify-content: center; align-items: center; text-align: center; width: 100%;
+        justify-content: center; align-items: center; text-align: center;
     }
 
-    /* 버튼 크기 및 중앙 정렬 복구 (화면 가로 꽉 채우기) */
-    div.stButton {
-        display: flex !important;
-        justify-content: center !important;
-        width: 100% !important;
-    }
-    div.stButton > button {
-        width: 100% !important;
-        min-width: 300px;
-        max-width: 100%;
-        border-radius: 12px;
-        height: 3.8em;
-        background-color: #3B8ED0;
-        color: white;
-        font-weight: bold;
-        margin: 0 auto !important;
+    /* 시작/종료 버튼 강제 중앙 및 크기 고정 */
+    div.stButton { display: flex !important; justify-content: center !important; width: 100%; }
+    .stButton > button {
+        width: 90% !important; border-radius: 12px; height: 3.5em;
+        background-color: #3B8ED0; color: white; font-weight: bold; margin: 0 auto !important;
     }
 
-    /* 설정 및 음성 ON 한 줄 배치 */
-    .settings-header {
-        display: flex; justify-content: space-between; align-items: center;
-        width: 100%; margin: 10px 0;
-    }
-
-    /* 숫자 입력 칸 강제 너비 축소 및 여백 제거 */
-    div[data-testid="stNumberInput"] {
-        width: 65px !important;
-        min-width: 65px !important;
-    }
-    div[data-testid="stNumberInput"] label { display: none; }
+    /* 설정창 테이블 스타일 (줄바꿈 원천 차단) */
+    .setting-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    .setting-table td { padding: 2px; vertical-align: middle; }
+    .label-cell { font-size: 13px; font-weight: bold; width: 45px; white-space: nowrap; color: #ddd; }
     
-    /* 컬럼 간격 최소화 */
-    [data-testid="column"] {
-        padding: 0px !important;
-        flex: none !important;
-        width: auto !important;
-    }
+    /* 숫자 입력창 레이블 숨기기 및 크기 고정 */
+    div[data-testid="stNumberInput"] label { display: none; }
+    div[data-testid="stNumberInput"] { width: 75px !important; min-width: 75px !important; }
     
     .footer { position: fixed; left: 0; bottom: 5px; width: 100%; color: #444; text-align: center; font-size: 9px; }
     </style>
@@ -120,22 +97,25 @@ if not st.session_state.running:
             st.session_state.cycles = 0
             st.rerun()
 
-    # 설정 구역
+    # 설정 및 음성 토글 (한 줄 배치)
     st.write("---")
-    s_col1, s_col2 = st.columns([1, 1])
+    s_col1, s_col2 = st.columns([2, 1])
     with s_col1: st.markdown("<p style='font-weight:bold; margin-top:10px;'>⚙️ 설정</p>", unsafe_allow_html=True)
     with s_col2: st.session_state.speech_enabled = st.toggle("음성 ON", value=st.session_state.speech_enabled)
 
-    # 한 줄 배치 (텍스트와 입력창 간격 밀착)
-    def compact_input(label1, key1, label2, key2):
-        c1, c2, c3, c4 = st.columns([0.4, 1, 0.6, 1])
-        c1.markdown(f"<p style='margin-top:10px; font-size:12px;'>{label1}</p>", unsafe_allow_html=True)
-        st.session_state[key1] = c2.number_input(label1, 1, 20, st.session_state[key1], key=f"v_{key1}")
-        c3.markdown(f"<p style='margin-top:10px; font-size:12px;'>{label2}</p>", unsafe_allow_html=True)
-        st.session_state[key2] = c4.number_input(label2, 0, 20, st.session_state[key2], key=f"v_{key2}")
+    # 4분할 가로 배치 (들숨-숫자-멈춤1-숫자)
+    # 아이폰 가로폭에 맞춰 컬럼 비율을 매우 촘촘하게 수동 조정
+    c1, c2, c3, c4 = st.columns([0.6, 1, 0.8, 1])
+    c1.markdown("<p class='label-cell' style='margin-top:10px;'>들숨</p>", unsafe_allow_html=True)
+    st.session_state.inhale = c2.number_input("in", 1, 20, st.session_state.inhale, key="in_17")
+    c3.markdown("<p class='label-cell' style='margin-top:10px;'>멈춤1</p>", unsafe_allow_html=True)
+    st.session_state.hold1 = c4.number_input("h1", 0, 20, st.session_state.hold1, key="h1_17")
 
-    compact_input("들숨", "inhale", "멈춤1", "hold1")
-    compact_input("날숨", "exhale", "멈춤2", "hold2")
+    c5, c6, c7, c8 = st.columns([0.6, 1, 0.8, 1])
+    c5.markdown("<p class='label-cell' style='margin-top:10px;'>날숨</p>", unsafe_allow_html=True)
+    st.session_state.exhale = c6.number_input("ex", 1, 20, st.session_state.exhale, key="ex_17")
+    c7.markdown("<p class='label-cell' style='margin-top:10px;'>멈춤2</p>", unsafe_allow_html=True)
+    st.session_state.hold2 = c8.number_input("h2", 0, 20, st.session_state.hold2, key="h2_17")
 
     # 최근 기록 상시 노출
     st.markdown("<p style='margin-top:20px; font-weight:bold; border-bottom:1px solid #444;'>📊 최근 기록</p>", unsafe_allow_html=True)
