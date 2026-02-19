@@ -8,14 +8,15 @@ import streamlit.components.v1 as components
 # --- 페이지 설정 ---
 st.set_page_config(page_title="Mindful Breath", page_icon="🧘", layout="centered")
 
-# --- 음성 안내 함수 (JavaScript 활용) ---
-def announce_step(text):
-    if text:
+# --- 음성 안내 함수 (스위치 상태에 따라 동작) ---
+def announce_step(text, speech_enabled):
+    if speech_enabled and text:
         components.html(
             f"""
             <script>
                 var msg = new SpeechSynthesisUtterance('{text}');
                 msg.lang = 'ko-KR';
+                msg.rate = 1.0; 
                 window.speechSynthesis.speak(msg);
             </script>
             """,
@@ -85,7 +86,12 @@ if not st.session_state.running:
         st.success("✅ 기록이 안전하게 저장되었습니다!")
         st.session_state.save_success = False
 
-    with st.expander("⚙️ 호흡 설정 (Settings)", expanded=True):
+    with st.expander("⚙️ 설정 (Settings)", expanded=True):
+        # 음성 ON/OFF 스위치 추가
+        speech_on = st.toggle("음성 안내 활성화", value=True, help="호흡 단계별로 음성 가이드를 제공합니다.")
+        st.session_state.speech_enabled = speech_on
+        
+        st.write("---")
         col1, col2 = st.columns(2)
         with col1:
             st.session_state.inhale = st.number_input("Inhale (들숨)", 1, 20, st.session_state.inhale)
@@ -122,8 +128,8 @@ else:
         for idx, (name, dur, color, guide, speech_text) in enumerate(pattern_list):
             if dur == 0 or not st.session_state.running: continue
             
-            # 단계가 바뀔 때 음성 안내 실행
-            announce_step(speech_text)
+            # 음성 ON/OFF 상태를 확인하여 안내 실행
+            announce_step(speech_text, st.session_state.speech_enabled)
             
             for remaining in range(dur, 0, -1):
                 if not st.session_state.running: break
