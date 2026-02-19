@@ -6,152 +6,136 @@ import os
 import streamlit.components.v1 as components
 
 # --- 페이지 설정 ---
-st.set_page_config(page_title="호흡 연습", page_icon="🧘", layout="centered")
+st.set_page_config(page_title="Mindful Breath", page_icon="🧘", layout="centered")
 
-# --- 음성 안내 함수 ---
-def announce_step(text, speech_enabled):
-    if speech_enabled and text:
+# --- 음성 안내 함수 (JavaScript 활용) ---
+def announce_step(text):
+    if text:
         components.html(
-            f"""<script>
+            f"""
+            <script>
                 var msg = new SpeechSynthesisUtterance('{text}');
                 msg.lang = 'ko-KR';
                 window.speechSynthesis.speak(msg);
-            </script>""", height=0,
+            </script>
+            """,
+            height=0,
         )
 
-# --- 스타일 커스텀 (아이폰 17 물리적 고정 레이아웃) ---
+# --- 스타일 커스텀 ---
 st.markdown("""
     <style>
-    .top-padding { height: 50px; } 
-    .block-container { padding: 0.5rem; max-width: 100% !important; }
-
-    /* 타이머/준비 영역 높이 및 중앙 고정 */
-    .fixed-height-container {
-        height: 140px; display: flex; flex-direction: column;
-        justify-content: center; align-items: center; text-align: center;
+    .main { background-color: #0E1117; }
+    .stButton>button {
+        width: 100%; border-radius: 15px; height: 3em;
+        background-color: #3B8ED0; color: white; font-weight: bold; border: none;
     }
-
-    /* 시작/종료 버튼 강제 중앙 및 크기 고정 */
-    div.stButton { display: flex !important; justify-content: center !important; width: 100%; }
-    .stButton > button {
-        width: 90% !important; border-radius: 12px; height: 3.5em;
-        background-color: #3B8ED0; color: white; font-weight: bold; margin: 0 auto !important;
+    .timer-text { font-size: 80px; font-weight: bold; text-align: center; color: #3B8ED0; margin: 20px 0; }
+    .status-text { font-size: 24px; text-align: center; font-weight: bold; }
+    .footer {
+        position: fixed; left: 0; bottom: 10px; width: 100%;
+        color: #555555; text-align: center; font-size: 12px;
     }
-
-    /* 설정창 테이블 스타일 (줄바꿈 원천 차단) */
-    .setting-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-    .setting-table td { padding: 2px; vertical-align: middle; }
-    .label-cell { font-size: 13px; font-weight: bold; width: 45px; white-space: nowrap; color: #ddd; }
-    
-    /* 숫자 입력창 레이블 숨기기 및 크기 고정 */
-    div[data-testid="stNumberInput"] label { display: none; }
-    div[data-testid="stNumberInput"] { width: 75px !important; min-width: 75px !important; }
-    
-    .footer { position: fixed; left: 0; bottom: 5px; width: 100%; color: #444; text-align: center; font-size: 9px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="top-padding"></div>', unsafe_allow_html=True)
-
-# --- 데이터 관리 ---
+# --- 데이터 관리 함수 ---
 LOG_FILE = "breathing_log.csv"
+
 def load_data():
     if os.path.exists(LOG_FILE):
-        try: return pd.read_csv(LOG_FILE)
-        except: return pd.DataFrame(columns=["DATE", "PATTERN", "CYCLES", "TIME"])
+        try:
+            return pd.read_csv(LOG_FILE)
+        except:
+            return pd.DataFrame(columns=["DATE", "PATTERN", "CYCLES", "TIME"])
     return pd.DataFrame(columns=["DATE", "PATTERN", "CYCLES", "TIME"])
 
 def save_data_callback():
     if 'start_time' in st.session_state and st.session_state.running:
         total_time = int(time.time() - st.session_state.start_time)
         pattern_str = f"{st.session_state.inhale}-{st.session_state.hold1}-{st.session_state.exhale}-{st.session_state.hold2}"
-        new_data = pd.DataFrame([[datetime.now().strftime("%m-%d %H:%M"), pattern_str, st.session_state.cycles, total_time]], 
-                                columns=["DATE", "PATTERN", "CYCLES", "TIME"])
+        
+        new_data = pd.DataFrame([[
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            pattern_str, 
+            st.session_state.cycles, 
+            total_time
+        ]], columns=["DATE", "PATTERN", "CYCLES", "TIME"])
+        
         df = load_data()
-        pd.concat([df, new_data], ignore_index=True).to_csv(LOG_FILE, index=False)
+        df = pd.concat([df, new_data], ignore_index=True)
+        df.to_csv(LOG_FILE, index=False)
+        
         st.session_state.running = False
         st.session_state.save_success = True
 
-# --- 세션 초기화 ---
+# --- 세션 상태 초기화 ---
 if 'running' not in st.session_state: st.session_state.running = False
 if 'cycles' not in st.session_state: st.session_state.cycles = 0
 if 'save_success' not in st.session_state: st.session_state.save_success = False
-if 'speech_enabled' not in st.session_state: st.session_state.speech_enabled = True
+
 for key, val in {'inhale': 4, 'exhale': 4, 'hold1': 4, 'hold2': 4}.items():
     if key not in st.session_state: st.session_state[key] = val
 
 # --- 메인 UI ---
-st.markdown("<h1 style='text-align:center; font-size:22px; color:#3B8ED0; margin:0;'>🧘 호흡 연습</h1>", unsafe_allow_html=True)
-
-ui_placeholder = st.empty()
-button_placeholder = st.container()
+st.title("🧘 MINDFUL BREATH")
 
 if not st.session_state.running:
-    with ui_placeholder.container():
-        st.markdown("<div class='fixed-height-container'><p style='color:#888; font-size:14px;'>준비가 되면 시작 버튼을 누르세요</p></div>", unsafe_allow_html=True)
+    if st.session_state.save_success:
+        st.success("✅ 기록이 안전하게 저장되었습니다!")
+        st.session_state.save_success = False
+
+    with st.expander("⚙️ 호흡 설정 (Settings)", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.session_state.inhale = st.number_input("Inhale (들숨)", 1, 20, st.session_state.inhale)
+            st.session_state.exhale = st.number_input("Exhale (날숨)", 1, 20, st.session_state.exhale)
+        with col2:
+            st.session_state.hold1 = st.number_input("Hold 1 (멈춤)", 0, 20, st.session_state.hold1)
+            st.session_state.hold2 = st.number_input("Hold 2 (멈춤)", 0, 20, st.session_state.hold2)
     
-    with button_placeholder:
-        if st.button("START (시작)"):
-            st.session_state.running = True
-            st.session_state.start_time = time.time()
-            st.session_state.cycles = 0
-            st.rerun()
+    if st.button("START PRACTICE (연습 시작)"):
+        st.session_state.running = True
+        st.session_state.start_time = time.time()
+        st.session_state.cycles = 0
+        st.rerun()
 
-    # 설정 및 음성 토글 (한 줄 배치)
-    st.write("---")
-    s_col1, s_col2 = st.columns([2, 1])
-    with s_col1: st.markdown("<p style='font-weight:bold; margin-top:10px;'>⚙️ 설정</p>", unsafe_allow_html=True)
-    with s_col2: st.session_state.speech_enabled = st.toggle("음성 ON", value=st.session_state.speech_enabled)
-
-    # 4분할 가로 배치 (들숨-숫자-멈춤1-숫자)
-    # 아이폰 가로폭에 맞춰 컬럼 비율을 매우 촘촘하게 수동 조정
-    c1, c2, c3, c4 = st.columns([0.6, 1, 0.8, 1])
-    c1.markdown("<p class='label-cell' style='margin-top:10px;'>들숨</p>", unsafe_allow_html=True)
-    st.session_state.inhale = c2.number_input("in", 1, 20, st.session_state.inhale, key="in_17")
-    c3.markdown("<p class='label-cell' style='margin-top:10px;'>멈춤1</p>", unsafe_allow_html=True)
-    st.session_state.hold1 = c4.number_input("h1", 0, 20, st.session_state.hold1, key="h1_17")
-
-    c5, c6, c7, c8 = st.columns([0.6, 1, 0.8, 1])
-    c5.markdown("<p class='label-cell' style='margin-top:10px;'>날숨</p>", unsafe_allow_html=True)
-    st.session_state.exhale = c6.number_input("ex", 1, 20, st.session_state.exhale, key="ex_17")
-    c7.markdown("<p class='label-cell' style='margin-top:10px;'>멈춤2</p>", unsafe_allow_html=True)
-    st.session_state.hold2 = c8.number_input("h2", 0, 20, st.session_state.hold2, key="h2_17")
-
-    # 최근 기록 상시 노출
-    st.markdown("<p style='margin-top:20px; font-weight:bold; border-bottom:1px solid #444;'>📊 최근 기록</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    st.subheader("📊 최근 기록 (Recent Logs)")
     df = load_data()
     if not df.empty:
         st.table(df.tail(5).iloc[::-1])
+    else:
+        st.info("아직 기록이 없습니다.")
 
 else:
-    with button_placeholder:
-        st.button("STOP & SAVE (중단 및 저장)", on_click=save_data_callback)
-
+    st.button("STOP & SAVE (중단 및 저장)", on_click=save_data_callback)
+    placeholder = st.empty()
     pattern_list = [
-        ("INHALE", st.session_state.inhale, "#3B8ED0", "들이마십니다"),
-        ("HOLD", st.session_state.hold1, "#2CC985", "멈춥니다"),
-        ("EXHALE", st.session_state.exhale, "#E74C3C", "내뱉습니다"),
-        ("HOLD", st.session_state.hold2, "#F39C12", "비우고 멈춥니다")
+        ("INHALE", st.session_state.inhale, "#3B8ED0", "숨을 깊게 마십니다", "들이마십니다"),
+        ("HOLD", st.session_state.hold1, "#2CC985", "머금고 멈춥니다", "멈춥니다"),
+        ("EXHALE", st.session_state.exhale, "#E74C3C", "천천히 내뱉습니다", "내뱉습니다"),
+        ("HOLD", st.session_state.hold2, "#F39C12", "비우고 멈춥니다", "비우고 멈춥니다")
     ]
     
     while st.session_state.running:
-        for idx, (name, dur, color, speech_text) in enumerate(pattern_list):
+        for idx, (name, dur, color, guide, speech_text) in enumerate(pattern_list):
             if dur == 0 or not st.session_state.running: continue
-            announce_step(speech_text, st.session_state.speech_enabled)
+            
+            # 단계가 바뀔 때 음성 안내 실행
+            announce_step(speech_text)
+            
             for remaining in range(dur, 0, -1):
                 if not st.session_state.running: break
                 elapsed = int(time.time() - st.session_state.start_time)
                 mins, secs = divmod(elapsed, 60)
-                with ui_placeholder.container():
-                    st.markdown(f"""
-                    <div class='fixed-height-container'>
-                        <div style='width:90%; text-align:right; font-size:11px; color:#777;'>⏱ {mins:02d}:{secs:02d} | 🔄 {st.session_state.cycles}회</div>
-                        <p style='color:{color}; font-size:22px; font-weight:bold; margin:5px 0;'>{name}</p>
-                        <div style='font-size:70px; font-weight:bold; color:{color}; line-height:1;'>{remaining}</div>
-                        <p style='font-size:13px; color:#888;'>{speech_text}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                with placeholder.container():
+                    st.markdown(f"<div style='text-align:right;'>⏱ {mins:02d}:{secs:02d} | 🔄 {st.session_state.cycles}회</div>", unsafe_allow_html=True)
+                    st.markdown(f"<p class='status-text' style='color:{color};'>{name}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='timer-text' style='color:{color};'>{remaining}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='text-align:center; color:gray;'>{guide}</p>", unsafe_allow_html=True)
                 time.sleep(1)
+            
             if idx == 3 and st.session_state.running:
                 st.session_state.cycles += 1
 
