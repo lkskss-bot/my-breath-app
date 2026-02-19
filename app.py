@@ -6,7 +6,7 @@ import os
 import streamlit.components.v1 as components
 
 # --- 페이지 설정 ---
-st.set_page_config(page_title="Mindful Breath", page_icon="🧘", layout="centered")
+st.set_page_config(page_title="호흡 연습", page_icon="🧘", layout="centered")
 
 # --- 음성 안내 함수 ---
 def announce_step(text, speech_enabled):
@@ -19,31 +19,29 @@ def announce_step(text, speech_enabled):
             </script>""", height=0,
         )
 
-# --- 스타일 커스텀 (모바일 최적화) ---
+# --- 스타일 커스텀 (초슬림 모바일 최적화) ---
 st.markdown("""
     <style>
-    /* 전체 여백 줄이기 */
-    .block-container { padding-top: 1rem; padding-bottom: 0rem; }
-    .stApp { background-color: #0E1117; }
+    .block-container { padding-top: 0.5rem; padding-bottom: 0rem; }
+    h1 { font-size: 22px !important; text-align: center; margin-bottom: 5px; color: #3B8ED0; }
+    .stCaption { text-align: center; margin-bottom: 5px; font-size: 10px !important; }
     
-    /* 타이틀 및 텍스트 크기 축소 */
-    h1 { font-size: 24px !important; text-align: center; margin-bottom: 0px; }
-    .stCaption { text-align: center; margin-bottom: 10px; }
+    /* 숫자 입력 칸 간격 줄이기 */
+    div[data-testid="stNumberInput"] { margin-bottom: -15px; }
     
-    /* 버튼 스타일 및 중앙 배치 */
+    /* 버튼 스타일 */
     .stButton>button {
-        width: 100%; border-radius: 12px; height: 3.5em;
+        width: 100%; border-radius: 10px; height: 3em;
         background-color: #3B8ED0; color: white; font-weight: bold; border: none;
-        margin-top: 10px;
     }
     
-    /* 타이머 섹션 콤팩트화 */
-    .timer-text { font-size: 60px !important; font-weight: bold; text-align: center; margin: 5px 0; }
-    .status-text { font-size: 20px !important; text-align: center; font-weight: bold; margin-bottom: 0px; }
-    .guide-text { font-size: 14px; text-align: center; color: gray; margin-bottom: 10px; }
+    /* 타이머 및 상태 텍스트 압축 */
+    .timer-text { font-size: 50px !important; font-weight: bold; text-align: center; margin: 0px; line-height: 1.2; }
+    .status-text { font-size: 18px !important; text-align: center; font-weight: bold; margin-top: 5px; }
+    .guide-text { font-size: 12px; text-align: center; color: gray; margin-bottom: 5px; }
     
-    /* 하단 푸터 고정 */
-    .footer { position: fixed; left: 0; bottom: 5px; width: 100%; color: #444; text-align: center; font-size: 10px; }
+    /* 푸터 */
+    .footer { position: fixed; left: 0; bottom: 5px; width: 100%; color: #444; text-align: center; font-size: 9px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -70,14 +68,14 @@ def save_data_callback():
 if 'running' not in st.session_state: st.session_state.running = False
 if 'cycles' not in st.session_state: st.session_state.cycles = 0
 if 'save_success' not in st.session_state: st.session_state.save_success = False
+if 'speech_enabled' not in st.session_state: st.session_state.speech_enabled = True
 for key, val in {'inhale': 4, 'exhale': 4, 'hold1': 4, 'hold2': 4}.items():
     if key not in st.session_state: st.session_state[key] = val
 
 # --- 메인 UI ---
-st.title("🧘 MINDFUL BREATH")
-st.caption("v4.5 Mobile Optimized")
+st.title("🧘 호흡 연습")
 
-# 중앙 버튼 배치를 위한 컨테이너
+# 중앙 버튼 컨테이너 (시작/중단 버튼 위치 고정)
 button_placeholder = st.container()
 
 if not st.session_state.running:
@@ -86,26 +84,36 @@ if not st.session_state.running:
         st.session_state.save_success = False
 
     with button_placeholder:
-        if st.button("START PRACTICE (연습 시작)"):
+        if st.button("START (시작)"):
             st.session_state.running = True
             st.session_state.start_time = time.time()
             st.session_state.cycles = 0
             st.rerun()
 
-    with st.expander("⚙️ 설정 및 기록", expanded=False):
-        speech_on = st.toggle("음성 안내", value=True)
-        st.session_state.speech_enabled = speech_on
-        c1, c2 = st.columns(2)
-        st.session_state.inhale = c1.number_input("Inhale", 1, 20, st.session_state.inhale)
-        st.session_state.exhale = c1.number_input("Exhale", 1, 20, st.session_state.exhale)
-        st.session_state.hold1 = c2.number_input("Hold 1", 0, 20, st.session_state.hold1)
-        st.session_state.hold2 = c2.number_input("Hold 2", 0, 20, st.session_state.hold2)
-        
-        st.write("---")
+    # 설정 구역
+    st.write("")
+    col_set, col_voice = st.columns([1, 1])
+    with col_set:
+        st.markdown("**⚙️ 설정**", unsafe_allow_html=True)
+    with col_voice:
+        st.session_state.speech_enabled = st.toggle("음성 ON", value=st.session_state.speech_enabled)
+
+    # 2x2 그리드 배치 (들숨-멈춤1 / 날숨-멈춤2)
+    c1, c2 = st.columns(2)
+    st.session_state.inhale = c1.number_input("들숨 (Inhale)", 1, 20, st.session_state.inhale)
+    st.session_state.hold1 = c2.number_input("멈춤1 (Hold)", 0, 20, st.session_state.hold1)
+    
+    c3, c4 = st.columns(2)
+    st.session_state.exhale = c3.number_input("날숨 (Exhale)", 1, 20, st.session_state.exhale)
+    st.session_state.hold2 = c4.number_input("멈춤2 (Hold)", 0, 20, st.session_state.hold2)
+
+    # 최근 기록 요약 (접기 가능)
+    with st.expander("📊 기록 보기", expanded=False):
         df = load_data()
         if not df.empty: st.table(df.tail(3).iloc[::-1])
 
 else:
+    # 실행 중일 때 버튼 위치 동일하게 유지
     with button_placeholder:
         st.button("STOP & SAVE (중단 및 저장)", on_click=save_data_callback)
     
@@ -126,7 +134,7 @@ else:
                 elapsed = int(time.time() - st.session_state.start_time)
                 mins, secs = divmod(elapsed, 60)
                 with ui_space.container():
-                    st.markdown(f"<div style='text-align:right; font-size:12px;'>⏱ {mins:02d}:{secs:02d} | 🔄 {st.session_state.cycles}회</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:right; font-size:11px; margin-top:10px;'>⏱ {mins:02d}:{secs:02d} | 🔄 {st.session_state.cycles}회</div>", unsafe_allow_html=True)
                     st.markdown(f"<p class='status-text' style='color:{color};'>{name}</p>", unsafe_allow_html=True)
                     st.markdown(f"<div class='timer-text' style='color:{color};'>{remaining}</div>", unsafe_allow_html=True)
                     st.markdown(f"<p class='guide-text'>{speech_text}</p>", unsafe_allow_html=True)
