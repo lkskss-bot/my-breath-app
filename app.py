@@ -3,9 +3,24 @@ import time
 import pandas as pd
 from datetime import datetime
 import os
+import streamlit.components.v1 as components
 
 # --- 페이지 설정 ---
 st.set_page_config(page_title="Mindful Breath", page_icon="🧘", layout="centered")
+
+# --- 음성 안내 함수 (JavaScript 활용) ---
+def announce_step(text):
+    if text:
+        components.html(
+            f"""
+            <script>
+                var msg = new SpeechSynthesisUtterance('{text}');
+                msg.lang = 'ko-KR';
+                window.speechSynthesis.speak(msg);
+            </script>
+            """,
+            height=0,
+        )
 
 # --- 스타일 커스텀 ---
 st.markdown("""
@@ -18,13 +33,8 @@ st.markdown("""
     .timer-text { font-size: 80px; font-weight: bold; text-align: center; color: #3B8ED0; margin: 20px 0; }
     .status-text { font-size: 24px; text-align: center; font-weight: bold; }
     .footer {
-        position: fixed;
-        left: 0;
-        bottom: 10px;
-        width: 100%;
-        color: #555555;
-        text-align: center;
-        font-size: 12px;
+        position: fixed; left: 0; bottom: 10px; width: 100%;
+        color: #555555; text-align: center; font-size: 12px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -34,7 +44,10 @@ LOG_FILE = "breathing_log.csv"
 
 def load_data():
     if os.path.exists(LOG_FILE):
-        return pd.read_csv(LOG_FILE)
+        try:
+            return pd.read_csv(LOG_FILE)
+        except:
+            return pd.DataFrame(columns=["DATE", "PATTERN", "CYCLES", "TIME"])
     return pd.DataFrame(columns=["DATE", "PATTERN", "CYCLES", "TIME"])
 
 def save_data_callback():
@@ -66,7 +79,6 @@ for key, val in {'inhale': 4, 'exhale': 4, 'hold1': 4, 'hold2': 4}.items():
 
 # --- 메인 UI ---
 st.title("🧘 MINDFUL BREATH")
-st.caption("마음 챙김 호흡 가이드 (v4.5 Mobile)")
 
 if not st.session_state.running:
     if st.session_state.save_success:
@@ -100,15 +112,19 @@ else:
     st.button("STOP & SAVE (중단 및 저장)", on_click=save_data_callback)
     placeholder = st.empty()
     pattern_list = [
-        ("INHALE (들숨)", st.session_state.inhale, "#3B8ED0", "숨을 깊게 마십니다"),
-        ("HOLD (멈춤)", st.session_state.hold1, "#2CC985", "머금고 멈춥니다"),
-        ("EXHALE (날숨)", st.session_state.exhale, "#E74C3C", "천천히 내뱉습니다"),
-        ("HOLD (멈춤)", st.session_state.hold2, "#F39C12", "비우고 멈춥니다")
+        ("INHALE", st.session_state.inhale, "#3B8ED0", "숨을 깊게 마십니다", "들이마십니다"),
+        ("HOLD", st.session_state.hold1, "#2CC985", "머금고 멈춥니다", "멈춥니다"),
+        ("EXHALE", st.session_state.exhale, "#E74C3C", "천천히 내뱉습니다", "내뱉습니다"),
+        ("HOLD", st.session_state.hold2, "#F39C12", "비우고 멈춥니다", "비우고 멈춥니다")
     ]
     
     while st.session_state.running:
-        for idx, (name, dur, color, guide) in enumerate(pattern_list):
+        for idx, (name, dur, color, guide, speech_text) in enumerate(pattern_list):
             if dur == 0 or not st.session_state.running: continue
+            
+            # 단계가 바뀔 때 음성 안내 실행
+            announce_step(speech_text)
+            
             for remaining in range(dur, 0, -1):
                 if not st.session_state.running: break
                 elapsed = int(time.time() - st.session_state.start_time)
@@ -119,8 +135,8 @@ else:
                     st.markdown(f"<div class='timer-text' style='color:{color};'>{remaining}</div>", unsafe_allow_html=True)
                     st.markdown(f"<p style='text-align:center; color:gray;'>{guide}</p>", unsafe_allow_html=True)
                 time.sleep(1)
+            
             if idx == 3 and st.session_state.running:
                 st.session_state.cycles += 1
 
-# --- 하단 문구 (Footnote) ---
 st.markdown('<div class="footer">Lim의 첫 모바일 작품 with Gemini</div>', unsafe_allow_html=True)
